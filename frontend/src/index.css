@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #e63946;
+  --color-brand-dark: #c1121f;
+  --color-brand-light: #ffb703;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+}
+
+/* Base Styles */
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  @apply transition-colors duration-500;
+}
+
+/* Custom Glassmorphism */
+.glass-panel {
+  @apply bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/50 dark:border-slate-700/50 shadow-2xl transition-all duration-300;
+}
+
+.glass-panel:hover {
+  @apply border-brand/20 dark:border-brand/30 shadow-brand/5;
+}
+
+.glass-input {
+  @apply bg-white/50 dark:bg-slate-800/50 backdrop-blur-md border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-brand focus:border-transparent transition-all duration-300;
+}
+
+/* Interactive Elements */
+.interactive-card {
+  @apply hover:scale-[1.01] active:scale-[0.99] transition-all duration-300 cursor-default;
+}
+
+.hover-glow {
+  @apply relative overflow-hidden;
+}
+
+.hover-glow::after {
+  content: '';
+  @apply absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full transition-transform duration-500;
+}
+
+.hover-glow:hover::after {
+  @apply translate-x-full;
+}
+
+/* Theme Toggle Animation */
+.theme-toggle-btn {
+  @apply relative w-10 h-10 flex items-center justify-center rounded-xl bg-slate-200/50 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-300;
+}
+
+/* Animations */
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 dark:bg-slate-700 rounded-full;
+}

@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+langchain
+chromadb
+faiss-cpu
+sentence-transformers
+transformers
+torch
+openai-whisper
+pydub
+requests
+beautifulsoup4
+scikit-learn
+Pillow
+opencv-python
