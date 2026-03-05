@@ -9,9 +9,14 @@ Corrective RAG System with Cache-First Strategy
 import asyncio
 import os
 from typing import List, Dict, Tuple, Optional
-from services.cache_manager import get_cache_manager
-from services.serp_news import search_related_news_from_query
-from services.reference_manager import get_reference_manager
+try:
+    from services.cache_manager import get_cache_manager
+    from services.serp_news import search_related_news_from_query
+    from services.reference_manager import get_reference_manager
+except ModuleNotFoundError:
+    from backend.services.cache_manager import get_cache_manager
+    from backend.services.serp_news import search_related_news_from_query
+    from backend.services.reference_manager import get_reference_manager
 
 class CorrrectiveRAG:
     """

@@ -5,7 +5,10 @@ from urllib.parse import urlparse
 
 from serpapi import GoogleSearch
 
-from services.article_fetcher import extract_domain, fetch_article
+try:
+    from services.article_fetcher import extract_domain, fetch_article
+except ModuleNotFoundError:
+    from backend.services.article_fetcher import extract_domain, fetch_article
 
 STOPWORDS = {
     "www",

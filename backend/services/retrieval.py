@@ -5,7 +5,10 @@ try:
 except Exception:
     FAISS = None
 
-from models.embeddings import get_embeddings
+try:
+    from models.embeddings import get_embeddings
+except ModuleNotFoundError:
+    from backend.models.embeddings import get_embeddings
 
 vectorstore = None
 _vectorstore_initialized = False

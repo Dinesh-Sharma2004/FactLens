@@ -33,9 +33,14 @@ def _load_local_env():
 
 _load_local_env()
 
-from routes.fact_check import router as fact_router
-from routes.voice import router as voice_router
-from routes.image_verify import router as image_router
+try:
+    from routes.fact_check import router as fact_router
+    from routes.voice import router as voice_router
+    from routes.image_verify import router as image_router
+except ModuleNotFoundError:
+    from backend.routes.fact_check import router as fact_router
+    from backend.routes.voice import router as voice_router
+    from backend.routes.image_verify import router as image_router
 
 app = FastAPI(title="Fact Lens API", version="1.0.0")
 

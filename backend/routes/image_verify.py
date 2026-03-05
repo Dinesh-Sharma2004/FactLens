@@ -2,7 +2,10 @@ from fastapi import APIRouter, UploadFile, File
 import shutil
 import os
 
-from services.image_verifier import verify_image
+try:
+    from services.image_verifier import verify_image
+except ModuleNotFoundError:
+    from backend.services.image_verifier import verify_image
 
 router = APIRouter()
 

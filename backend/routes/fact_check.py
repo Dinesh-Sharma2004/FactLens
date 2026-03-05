@@ -11,14 +11,24 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from models.llm import generate_text_async
-from services.cache import get_cache, set_cache
-from services.confidence import compute_confidence_explain
-from services.multilingual import translate_to_english
-from services.article_fetcher import extract_domain, fetch_article
-from services.rag_cache import get_rag
-from services.reference_manager import create_request_reference_manager
-from services.serp_news import search_related_news_from_url
+try:
+    from models.llm import generate_text_async
+    from services.cache import get_cache, set_cache
+    from services.confidence import compute_confidence_explain
+    from services.multilingual import translate_to_english
+    from services.article_fetcher import extract_domain, fetch_article
+    from services.rag_cache import get_rag
+    from services.reference_manager import create_request_reference_manager
+    from services.serp_news import search_related_news_from_url
+except ModuleNotFoundError:
+    from backend.models.llm import generate_text_async
+    from backend.services.cache import get_cache, set_cache
+    from backend.services.confidence import compute_confidence_explain
+    from backend.services.multilingual import translate_to_english
+    from backend.services.article_fetcher import extract_domain, fetch_article
+    from backend.services.rag_cache import get_rag
+    from backend.services.reference_manager import create_request_reference_manager
+    from backend.services.serp_news import search_related_news_from_url
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -771,7 +781,10 @@ async def fact_check_stream(request: QueryRequest):
             })
             return
 
-        from models.llm import stream_generate_async
+        try:
+            from models.llm import stream_generate_async
+        except ModuleNotFoundError:
+            from backend.models.llm import stream_generate_async
         ref_manager = create_request_reference_manager()
         streamed_tokens = []
         news = []

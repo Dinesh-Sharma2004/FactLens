@@ -5,7 +5,10 @@ import uuid
 from fastapi import APIRouter, File, UploadFile
 import requests
 
-from models.whisper_model import transcribe_audio
+try:
+    from models.whisper_model import transcribe_audio
+except ModuleNotFoundError:
+    from backend.models.whisper_model import transcribe_audio
 
 router = APIRouter()
 

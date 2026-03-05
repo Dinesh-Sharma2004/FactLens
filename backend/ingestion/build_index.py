@@ -1,5 +1,8 @@
 from langchain_community.vectorstores import FAISS
-from models.embeddings import get_embeddings
+try:
+    from models.embeddings import get_embeddings
+except ModuleNotFoundError:
+    from backend.models.embeddings import get_embeddings
 
 def build_faiss_index(chunks):
     embeddings = get_embeddings()
