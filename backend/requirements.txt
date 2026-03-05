@@ -1,6 +1,37 @@
+# Web Framework
 fastapi==0.116.1
 uvicorn[standard]==0.35.0
-requests==2.32.5
 python-multipart==0.0.20
+
+# Core Dependencies
+requests==2.32.5
 Pillow==11.3.0
 redis==6.4.0
+
+# LLM & ML Models
+openai>=1.0.0
+google-search-results>=2.4.2
+groq>=0.9.0
+
+# LangChain & Vector Store
+langchain>=0.1.0
+langchain-community>=0.0.10
+langchain-huggingface>=0.0.1
+langchain-openai>=0.1.0
+faiss-cpu>=1.7.4
+
+# NLP & Embeddings
+transformers>=4.30.0
+sentence-transformers>=2.2.0
+torch>=2.0.0
+
+# Audio Processing
+openai-whisper>=20231117
+
+# Web Scraping & Parsing
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.0.0

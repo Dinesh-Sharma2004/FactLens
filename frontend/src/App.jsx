@@ -2,16 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import InputBox from "./components/InputBox";
 import AudioRecorder from "./components/AudioRecorder";
-import ImageUpload from "./components/ImageUpload";
 import ResultCard from "./components/ResultCard";
-import { streamFactCheck } from "./services/api";
+import { streamFactCheck, transcribeAudio } from "./services/api";
 
 function App() {
-  const [query, setQuery] = useState("");
-  const [response, setResponse] = useState("");
-  const [meta, setMeta] = useState(null);
-  const [mode, setMode] = useState("rag");
-  const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState("verify");
   const [dark, setDark] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('theme') === 'dark' || 
@@ -19,15 +14,88 @@ function App() {
     }
     return false;
   });
+
+  // Separate state for each mode
+  const [modeData, setModeData] = useState({
+    verify: {
+      query: "",
+      response: "",
+      meta: null,
+      submittedInput: "",
+      loading: false,
+      mediaStatus: "",
+      abortController: null,
+      requestSeq: 0,
+    },
+    summarize: {
+      query: "",
+      response: "",
+      meta: null,
+      submittedInput: "",
+      loading: false,
+      mediaStatus: "",
+      abortController: null,
+      requestSeq: 0,
+    },
+  });
+
+  // Get current mode data
+  const currentData = modeData[mode];
+  
+  // Setter function for current mode
+  const setCurrentModeData = (updates) => {
+    setModeData((prev) => ({
+      ...prev,
+      [mode]: {
+        ...prev[mode],
+        ...updates,
+      },
+    }));
+  };
+
+  // Expose current mode data through individual setters for compatibility
+  const setQuery = (value) => {
+    setCurrentModeData({ query: typeof value === "function" ? value(currentData.query) : value });
+  };
+  const setResponse = (value) => {
+    setCurrentModeData({ response: typeof value === "function" ? value(currentData.response) : value });
+  };
+  const setMeta = (value) => {
+    setCurrentModeData({ meta: typeof value === "function" ? value(currentData.meta) : value });
+  };
+  const setSubmittedInput = (value) => {
+    setCurrentModeData({ submittedInput: typeof value === "function" ? value(currentData.submittedInput) : value });
+  };
+  const setLoading = (value) => {
+    setCurrentModeData({ loading: typeof value === "function" ? value(currentData.loading) : value });
+  };
+  const setMediaStatus = (value) => {
+    setCurrentModeData({ mediaStatus: typeof value === "function" ? value(currentData.mediaStatus) : value });
+  };
+  const setAbortController = (value) => {
+    setCurrentModeData({ abortController: value });
+  };
+  const setRequestSeq = (value) => {
+    setCurrentModeData({ requestSeq: typeof value === "function" ? value(currentData.requestSeq) : value });
+  };
+
   const scrollRef = useRef(null);
+  const modeRef = useRef(mode);
+  const requestSeqRef = useRef({ verify: 0, summarize: 0 });
+
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
 
   useEffect(() => {
     if (dark) {
       document.documentElement.classList.add('dark');
       localStorage.setItem('theme', 'dark');
+      document.documentElement.style.colorScheme = "dark";
     } else {
       document.documentElement.classList.remove('dark');
       localStorage.setItem('theme', 'light');
+      document.documentElement.style.colorScheme = "light";
     }
   }, [dark]);
 
@@ -35,28 +103,112 @@ function App() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [response]);
+  }, [currentData.response]);
 
   const handleSubmit = async () => {
-    if (!query.trim()) return;
+    if (!currentData.query.trim()) return;
 
+    if (currentData.abortController) {
+      currentData.abortController.abort();
+    }
+    const controller = new AbortController();
+    setAbortController(controller);
+    const newSeq = currentData.requestSeq + 1;
+    setRequestSeq(newSeq);
+    const modeAtSubmit = mode;
+    requestSeqRef.current[modeAtSubmit] = newSeq;
+    const submitted = currentData.query.trim();
+
+    setSubmittedInput(submitted);
     setResponse("");
     setMeta(null);
     setLoading(true);
 
     try {
-      await streamFactCheck(query, mode, (chunk) => {
+      await streamFactCheck(submitted, modeAtSubmit, (chunk) => {
+        const stale =
+          requestSeqRef.current[modeAtSubmit] !== newSeq ||
+          modeRef.current !== modeAtSubmit;
+        if (stale) return;
+
         if (chunk.type === "text") {
-          setResponse((prev) => prev + chunk.data);
+          setModeData((prev) => ({
+            ...prev,
+            [modeAtSubmit]: {
+              ...prev[modeAtSubmit],
+              response: prev[modeAtSubmit].response + chunk.data,
+            },
+          }));
+        } else if (chunk.type === "start") {
+          // Stream is starting
+          setModeData((prev) => ({
+            ...prev,
+            [modeAtSubmit]: {
+              ...prev[modeAtSubmit],
+              response: "Generating verdict...",
+            },
+          }));
+        } else if (chunk.type === "status") {
+          setModeData((prev) => ({
+            ...prev,
+            [modeAtSubmit]: {
+              ...prev[modeAtSubmit],
+              mediaStatus: chunk.data || "",
+            },
+          }));
         } else if (chunk.type === "meta") {
-          setMeta(chunk.data);
-          setLoading(false);
+          setModeData((prev) => ({
+            ...prev,
+            [modeAtSubmit]: {
+              ...prev[modeAtSubmit],
+              meta: chunk.data,
+              loading: false,
+              mediaStatus: "",
+            },
+          }));
         }
-      });
+      }, controller.signal);
     } catch (error) {
+      if (error?.name === "AbortError") {
+        return;
+      }
       console.error("Fact check failed:", error);
       setLoading(false);
       setResponse("An error occurred during verification. Please try again.");
+    } finally {
+      setModeData((prev) => {
+        if (prev[modeAtSubmit].abortController === controller) {
+          return {
+            ...prev,
+            [modeAtSubmit]: {
+              ...prev[modeAtSubmit],
+              abortController: null,
+            },
+          };
+        }
+        return prev;
+      });
+    }
+  };
+
+  const handleAudioReady = async (blob) => {
+    if (mode !== "verify") {
+      setMediaStatus("Speech input is available only in Verify Mode.");
+      return;
+    }
+    setMediaStatus("Transcribing audio...");
+    try {
+      const data = await transcribeAudio(blob);
+      const english = data?.transcript_english || data?.transcript || "";
+      if (english) {
+        setQuery((prev) => (prev ? `${prev} ${english}` : english));
+        setMediaStatus("Audio transcribed and added to input.");
+      } else {
+        setMediaStatus("No speech detected in recording.");
+      }
+    } catch (error) {
+      console.error("Audio transcription failed:", error);
+      setMediaStatus("Audio transcription failed.");
     }
   };
 
@@ -88,16 +240,16 @@ function App() {
           <div className="flex items-center gap-4">
             <div className="hidden sm:flex bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-full text-xs font-medium border border-slate-200/50 dark:border-slate-700/50">
               <button
-                onClick={() => setMode("rag")}
-                className={`px-4 py-1.5 rounded-full transition-all duration-300 ${mode === 'rag' ? 'bg-white dark:bg-slate-700 shadow-md text-brand scale-105' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                onClick={() => setMode("summarize")}
+                className={`px-4 py-1.5 rounded-full transition-all duration-300 ${mode === 'summarize' ? 'bg-white dark:bg-slate-700 shadow-md text-brand scale-105' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
               >
-                RAG Mode
+                Summarize Mode
               </button>
               <button
-                onClick={() => setMode("no_rag")}
-                className={`px-4 py-1.5 rounded-full transition-all duration-300 ${mode === 'no_rag' ? 'bg-white dark:bg-slate-700 shadow-md text-brand scale-105' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                onClick={() => setMode("verify")}
+                className={`px-4 py-1.5 rounded-full transition-all duration-300 ${mode === 'verify' ? 'bg-white dark:bg-slate-700 shadow-md text-brand scale-105' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
               >
-                Fast Mode
+                Verify Mode
               </button>
             </div>
             <button
@@ -149,34 +301,39 @@ function App() {
           <div className="flex flex-col gap-2">
             <div className="relative">
               <InputBox 
-                query={query} 
+                query={currentData.query} 
                 setQuery={setQuery} 
                 onSubmit={handleSubmit}
-                placeholder="Paste a claim, article link, or ask a question..."
+                placeholder={mode === "summarize" ? "Paste a trusted news URL for summary..." : "Paste a claim/news text to verify..."}
+                multiline={mode !== "summarize"}
               />
             </div>
             
             <div className="flex items-center justify-between p-3">
               <div className="flex items-center gap-2">
-                <AudioRecorder setQuery={setQuery} />
-                <ImageUpload />
+                {mode === "verify" && (
+                  <div className="flex items-center gap-2">
+                    <AudioRecorder onAudioReady={handleAudioReady} />
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Mic</span>
+                  </div>
+                )}
                 <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1" />
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter hidden sm:inline">
-                  {mode === 'rag' ? 'Comprehensive search active' : 'Direct verification active'}
+                  {mode === 'summarize' ? 'Trusted-source summarization active' : 'Evidence verification active'}
                 </span>
               </div>
               
               <button
                 onClick={handleSubmit}
-                disabled={loading || !query.trim()}
+                disabled={currentData.loading || !currentData.query.trim()}
                 className={`
                   flex items-center gap-2 px-8 py-3 rounded-2xl font-bold transition-all duration-300 shadow-xl
-                  ${loading || !query.trim() 
+                  ${currentData.loading || !currentData.query.trim() 
                     ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed shadow-none' 
                     : 'bg-brand hover:bg-brand-dark text-white hover:scale-105 active:scale-95 shadow-brand/30 hover:shadow-brand/40'}
                 `}
               >
-                {loading ? (
+                {currentData.loading ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     <span>Analyzing...</span>
@@ -195,8 +352,11 @@ function App() {
         </section>
 
         {/* RESULTS SECTION */}
+        {currentData.mediaStatus && (
+          <div className="mb-4 text-xs font-semibold text-brand">{currentData.mediaStatus}</div>
+        )}
         <AnimatePresence mode="wait">
-          {(response || loading) && (
+          {(currentData.response || currentData.loading) && (
             <motion.div
               initial={{ opacity: 0, y: 30, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -207,19 +367,19 @@ function App() {
               <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/20">
                 <h3 className="font-bold text-lg flex items-center gap-2">
                   <span className="w-2 h-2 bg-brand rounded-full animate-pulse" />
-                  Verification Report
+                  {mode === "summarize" ? "Summary Report" : "Verification Report"}
                 </h3>
-                {meta && (
+                {currentData.meta && (
                   <motion.div 
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                      parseFloat(meta.confidence) > 0.7 
+                      parseFloat(currentData.meta.confidence) > 0.7 
                       ? 'bg-green-100/50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' 
                       : 'bg-amber-100/50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800'
                     }`}
                   >
-                    {Math.round(parseFloat(meta.confidence) * 100)}% Confidence
+                    {Math.round(parseFloat(currentData.meta.confidence) * 100)}% Confidence
                   </motion.div>
                 )}
               </div>
@@ -228,7 +388,7 @@ function App() {
                 ref={scrollRef}
                 className="p-8 max-h-[600px] overflow-y-auto leading-relaxed text-slate-700 dark:text-slate-300"
               >
-                {loading && !response && (
+                {currentData.loading && !currentData.response && (
                   <div className="flex flex-col items-center justify-center py-16 gap-6">
                     <div className="relative">
                       <div className="w-16 h-16 border-4 border-brand/10 border-t-brand rounded-full animate-spin" />
@@ -244,19 +404,29 @@ function App() {
                 )}
                 
                 <div className="prose dark:prose-invert max-w-none prose-p:my-4 prose-p:leading-loose text-lg">
-                  {response}
-                  {loading && response && (
+                  {currentData.submittedInput && (
+                    <div className="mb-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 text-sm">
+                      <span className="font-semibold">Submitted Input:</span> {currentData.submittedInput}
+                    </div>
+                  )}
+                  {currentData.response}
+                  {currentData.loading && currentData.response && (
                     <span className="inline-block w-2 h-6 bg-brand ml-2 animate-pulse" />
                   )}
                 </div>
 
-                {meta && (
+                {currentData.meta && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 }}
                   >
-                    <ResultCard meta={meta} />
+                    <ResultCard meta={currentData.meta} />
+                    {currentData.meta.summarize_error && (
+                      <p className="mt-4 text-xs text-amber-600 dark:text-amber-400 font-semibold">
+                        {currentData.meta.summarize_error}
+                      </p>
+                    )}
                   </motion.div>
                 )}
               </div>

@@ -7,11 +7,27 @@ except Exception:
 
 from models.embeddings import get_embeddings
 
-embedding = get_embeddings()
+vectorstore = None
+_vectorstore_initialized = False
 
-if FAISS is None or embedding is None:
-    vectorstore = None
-else:
+
+def _ensure_vectorstore():
+    global vectorstore, _vectorstore_initialized
+
+    if _vectorstore_initialized:
+        return vectorstore
+
+    _vectorstore_initialized = True
+
+    if FAISS is None:
+        vectorstore = None
+        return vectorstore
+
+    embedding = get_embeddings()
+    if embedding is None:
+        vectorstore = None
+        return vectorstore
+
     try:
         vectorstore = FAISS.load_local(
             "data/vector_store",
@@ -21,10 +37,13 @@ else:
     except Exception:
         vectorstore = None
 
+    return vectorstore
+
 async def retrieve_docs_async(query):
-    if vectorstore is None:
+    store = _ensure_vectorstore()
+    if store is None:
         return []
 
     return await asyncio.to_thread(
-        vectorstore.similarity_search, query, 5
+        store.similarity_search, query, 5
     )

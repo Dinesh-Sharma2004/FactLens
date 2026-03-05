@@ -12,8 +12,11 @@ def get_embeddings():
         return None
 
     if _embedding_model is None:
-        _embedding_model = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
-        )
+        try:
+            _embedding_model = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-MiniLM-L6-v2"
+            )
+        except Exception:
+            _embedding_model = None
 
     return _embedding_model

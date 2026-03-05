@@ -1,6 +1,15 @@
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL ||
-  "https://backend-production-ffba0.up.railway.app/api";
+  "http://localhost:8000/api";
+
+function optimizeQuery(rawQuery) {
+  return (rawQuery || "")
+    .replace(/https?:\/\/\S+/gi, " ")
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 220);
+}
 
 function parseSSEBuffer(buffer, onEvent) {
   const events = buffer.split("\n\n");
@@ -23,11 +32,13 @@ function parseSSEBuffer(buffer, onEvent) {
   return remaining;
 }
 
-export async function streamFactCheck(query, mode, onData) {
+export async function streamFactCheck(query, mode, onData, signal) {
+  const optimizedQuery = mode === "summarize" ? (query || "").trim().slice(0, 500) : optimizeQuery(query);
   const res = await fetch(`${API_BASE}/fact-check-stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query, mode }),
+    body: JSON.stringify({ query: optimizedQuery || query, mode }),
+    signal,
   });
 
   if (!res.ok || !res.body) {
@@ -85,5 +96,29 @@ export async function verifyImage(file, query) {
     throw new Error(`Image verification failed with status ${res.status}`);
   }
 
+  return res.json();
+}
+
+export async function getCacheStats() {
+  const res = await fetch(`${API_BASE}/cache/stats`);
+  if (!res.ok) {
+    throw new Error(`Failed to get cache stats: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function getCacheStatus() {
+  const res = await fetch(`${API_BASE}/cache/status`);
+  if (!res.ok) {
+    throw new Error(`Failed to get cache status: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function clearCache() {
+  const res = await fetch(`${API_BASE}/cache/clear`, { method: "POST" });
+  if (!res.ok) {
+    throw new Error(`Failed to clear cache: ${res.status}`);
+  }
   return res.json();
 }

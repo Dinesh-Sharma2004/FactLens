@@ -1,4 +1,22 @@
-export default function InputBox({ query, setQuery, onSubmit, placeholder }) {
+export default function InputBox({ query, setQuery, onSubmit, placeholder, multiline = true }) {
+  if (!multiline) {
+    return (
+      <input
+        type="url"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            onSubmit();
+          }
+        }}
+        placeholder={placeholder || "Paste URL..."}
+        className="w-full h-14 px-6 bg-transparent border-none focus:ring-0 text-base placeholder:text-slate-400 dark:placeholder:text-slate-600"
+      />
+    );
+  }
+
   return (
     <textarea
       value={query}
