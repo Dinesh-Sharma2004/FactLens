@@ -16,6 +16,7 @@ router = APIRouter()
 @router.post("/voice-transcribe")
 async def voice_transcribe(file: UploadFile = File(...)):
     temp_name = f"temp_audio_{uuid.uuid4().hex}_{file.filename}"
+    mime_type = file.content_type or "application/octet-stream"
 
     try:
         with open(temp_name, "wb") as buffer:
@@ -23,7 +24,7 @@ async def voice_transcribe(file: UploadFile = File(...)):
 
         groq_key = os.getenv("GROQ_API_KEY", "").strip()
         if groq_key:
-            transcribed = _transcribe_with_groq(temp_name, groq_key)
+            transcribed = _transcribe_with_groq(temp_name, groq_key, mime_type)
             if transcribed:
                 english_text = _translate_to_english_with_groq(transcribed["text"], groq_key)
                 return {
@@ -36,6 +37,11 @@ async def voice_transcribe(file: UploadFile = File(...)):
         # Fallback local lightweight path when Groq is unavailable
         result = transcribe_audio(temp_name)
         transcript = (result or {}).get("text", "").strip()
+        if not transcript:
+            return {
+                "error": "Voice transcription is unavailable. Configure GROQ_API_KEY in production or enable a local Whisper runtime.",
+                "provider": "unavailable",
+            }
         return {
             "transcript": transcript,
             "transcript_english": transcript,
@@ -49,7 +55,7 @@ async def voice_transcribe(file: UploadFile = File(...)):
             os.remove(temp_name)
 
 
-def _transcribe_with_groq(audio_path: str, api_key: str):
+def _transcribe_with_groq(audio_path: str, api_key: str, mime_type: str):
     url = "https://api.groq.com/openai/v1/audio/transcriptions"
     headers = {"Authorization": f"Bearer {api_key}"}
     data = {
@@ -60,7 +66,7 @@ def _transcribe_with_groq(audio_path: str, api_key: str):
 
     try:
         with open(audio_path, "rb") as f:
-            files = {"file": (os.path.basename(audio_path), f, "audio/webm")}
+            files = {"file": (os.path.basename(audio_path), f, mime_type)}
             res = requests.post(url, headers=headers, data=data, files=files, timeout=40)
         res.raise_for_status()
         payload = res.json()

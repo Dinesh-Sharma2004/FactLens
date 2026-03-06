@@ -1,6 +1,8 @@
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL ||
-  "http://localhost:8000/api";
+  (typeof window !== "undefined" && window.location.hostname !== "localhost"
+    ? "https://backend-production-ffba0.up.railway.app/api"
+    : "http://localhost:8000/api");
 
 function optimizeQuery(rawQuery) {
   return (rawQuery || "")
