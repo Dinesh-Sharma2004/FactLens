@@ -13,20 +13,9 @@ openai>=1.0.0
 google-search-results>=2.4.2
 groq>=0.9.0
 
-# LangChain & Vector Store
+# Lightweight retrieval helpers
 langchain>=0.1.0
 langchain-community>=0.0.10
-langchain-huggingface>=0.0.1
-langchain-openai>=0.1.0
-faiss-cpu>=1.7.4
-
-# NLP & Embeddings
-transformers>=4.30.0
-sentence-transformers>=2.2.0
-torch>=2.0.0
-
-# Audio Processing
-openai-whisper>=20231117
 
 # Web Scraping & Parsing
 beautifulsoup4>=4.12.0
