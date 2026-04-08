@@ -1,7 +1,16 @@
+function normalizeApiBase(rawValue) {
+  const value = (rawValue || "").trim().replace(/\/+$/, "");
+  if (!value) {
+    return "";
+  }
+
+  return /\/api$/i.test(value) ? value : `${value}/api`;
+}
+
 const API_BASE =
-  import.meta.env.VITE_API_BASE_URL ||
+  normalizeApiBase(import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_ORIGIN) ||
   (typeof window !== "undefined" && window.location.hostname !== "localhost"
-    ? "https://backend-production-ffba0.up.railway.app/api"
+    ? `${window.location.origin}/api`
     : "http://localhost:8000/api");
 
 function optimizeQuery(rawQuery) {

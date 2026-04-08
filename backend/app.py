@@ -10,6 +10,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def _parse_cors_origins() -> list[str]:
+    raw = os.getenv("CORS_ORIGINS", "").strip()
+    if not raw:
+        return ["*"]
+
+    origins = [origin.strip().rstrip("/") for origin in raw.split(",") if origin.strip()]
+    return origins or ["*"]
+
+
 def _load_local_env():
     # Load .env from repo root (../.env) for local development.
     env_path = Path(__file__).resolve().parents[1] / ".env"
@@ -44,10 +53,13 @@ except ModuleNotFoundError:
 
 app = FastAPI(title="Fact Lens API", version="1.0.0")
 
+cors_origins = _parse_cors_origins()
+allow_all_origins = cors_origins == ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=cors_origins,
+    allow_credentials=not allow_all_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -59,6 +71,7 @@ async def startup_event():
     logger.info("🚀 Fact Lens Backend Starting...")
     logger.info(f"API Documentation: http://localhost:8000/docs")
     logger.info(f"Health Check: http://localhost:8000/health")
+    logger.info("CORS origins: %s", ", ".join(cors_origins))
 
 
 @app.get("/health")

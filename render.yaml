@@ -1,0 +1,68 @@
+services:
+  - type: web
+    name: et-factlens-backend
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      - key: GROQ_API_KEY
+        sync: false
+      - key: SERPAPI_KEY
+        sync: false
+      - key: HF_API_TOKEN
+        sync: false
+      - key: NEWS_API_KEY
+        sync: false
+      - key: REDIS_HOST
+        fromService:
+          type: keyvalue
+          name: et-factlens-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: keyvalue
+          name: et-factlens-redis
+          property: port
+      - key: REDIS_DB
+        value: "0"
+      - key: REDIS_TIMEOUT_SEC
+        value: "0.15"
+      - key: REDIS_RETRY_AFTER_SEC
+        value: "30"
+      - key: RAG_SEARCH_TIMEOUT_SEC
+        value: "2.5"
+      - key: ARTICLE_FETCH_TIMEOUT_SEC
+        value: "4.0"
+      - key: CORS_ORIGINS
+        fromService:
+          type: web
+          name: et-factlens-frontend
+          envVarKey: RENDER_EXTERNAL_URL
+
+  - type: web
+    name: et-factlens-frontend
+    runtime: static
+    rootDir: frontend
+    plan: free
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: et-factlens-backend
+          envVarKey: RENDER_EXTERNAL_URL
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  - type: keyvalue
+    name: et-factlens-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
