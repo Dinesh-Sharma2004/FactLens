@@ -47,7 +47,6 @@ services:
     name: et-factlens-frontend
     runtime: static
     rootDir: frontend
-    plan: free
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
     envVars:
